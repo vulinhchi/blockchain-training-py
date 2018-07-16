@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 
+from flask import Flask, jsonify
+
 
 class Block(object):
     def __init__(self, index, previous_hash, timestamp, data, nonce, hashvalue=''):
@@ -38,3 +40,24 @@ GENESIS = Block(
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         return o.__dict__
+
+
+class Server(object):
+    def __init__(self):
+        self.blocks = [GENESIS]
+        self.peers = {}
+
+        self.app = Flask(__name__)
+        self.app.config.from_object(self)
+        self.app.json_encoder = JSONEncoder
+        self.app.route('/blocks', methods=['GET'])(self.list_blocks)
+        self.app.route('/peers', methods=['GET'])(self.list_peers)
+
+    def list_blocks(self):
+        return jsonify(self.blocks)
+
+    def list_peers(self):
+        return jsonify(self.peers)
+
+    def run(self):
+        self.app.run(host='0.0.0.0', port=2345)
