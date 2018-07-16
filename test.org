@@ -1,0 +1,17 @@
+#+BEGIN_SRC http :pretty
+  GET 127.0.0.1:2232/blocks
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+[
+  {
+    "data": null,
+    "hash": "e063dac549f070b523b0cb724efb1d4f81de67ea790f78419f9527aa3450f64c",
+    "index": 0,
+    "nonce": 0,
+    "previous_hash": "",
+    "timestamp": 1522983367254
+  }
+]
+#+end_example
