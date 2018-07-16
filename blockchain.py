@@ -1,5 +1,9 @@
 import json
+import logging
+import socket
+import time
 from datetime import datetime
+from threading import Thread
 
 from flask import Flask, jsonify
 
@@ -47,11 +51,17 @@ class Server(object):
         self.blocks = [GENESIS]
         self.peers = {}
 
-        self.app = Flask(__name__)
-        self.app.config.from_object(self)
-        self.app.json_encoder = JSONEncoder
-        self.app.route('/blocks', methods=['GET'])(self.list_blocks)
-        self.app.route('/peers', methods=['GET'])(self.list_peers)
+        self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.udp_logger = logging.getLogger('UDP')
+
+        self.http = Flask(__name__)
+        self.http.config.from_object(self)
+        self.http.json_encoder = JSONEncoder
+        self.http.route('/blocks', methods=['GET'])(self.list_blocks)
+        self.http.route('/peers', methods=['GET'])(self.list_peers)
+        self.http.route('/blocks', methods=['POST'])(self.add_blocks)
+        self.http.route('/transactions', methods=['POST'])(self.add_transactions)
 
     def list_blocks(self):
         return jsonify(self.blocks)
@@ -59,5 +69,36 @@ class Server(object):
     def list_peers(self):
         return jsonify(self.peers)
 
-    def run(self):
-        self.app.run(host='0.0.0.0', port=2345)
+    def add_blocks(self):
+        # TODO
+        pass
+
+    def add_transactions(self):
+        # TODO
+        pass
+
+    def run(self, host='0.0.0.0'):
+        logging.info('Starting...')
+        self.udp.bind((host, 2346))
+        udp_listen = Thread(target=self.udp_listen)
+        udp_broadcast = Thread(target=self.udp_broadcast)
+        udp_listen.start()
+        udp_broadcast.start()
+
+        self.http.run(host=host, port=2345)
+        udp_listen.join()
+        udp_broadcast.join()
+
+    def udp_broadcast(self):
+        while True:
+            self.udp.sendto(b'hello', ('255.255.255.255', 2346))
+            time.sleep(1)
+
+    def udp_listen(self):
+        while True:
+            message, remote = self.udp.recvfrom(8)
+            address, _ = remote
+            self.udp_logger.debug([message, remote])
+            if message == b'hello' and address not in self.peers:
+                self.peers[address] = remote
+                self.udp_logger.info('Peer discovered: %s', remote)
