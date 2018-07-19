@@ -4,9 +4,10 @@ import socket
 import time
 from datetime import datetime
 from threading import Thread
-
+import hashlib
 from flask import Flask, jsonify
-
+from Crypto.PublicKey import RSA
+from Crypto import Random
 
 class Block(object):
     def __init__(self, index, previous_hash, timestamp, data, nonce, hashvalue=''):
@@ -18,9 +19,19 @@ class Block(object):
         self.hash = hashvalue
 
     def calculate_hash(self):
-        # TODO
-        pass
-
+        t = str(self.index)+str(self.previous_hash) +str(self.timestamp) +str(self.data) +str(self.nonce )
+        t = t.encode()
+        k = hashlib.sha256(t).hexdigest()
+        # sha = hasher.sha256()
+        # sha.update(str(self.index)+
+        #                 str(self.previous_hash) +
+        #                 str(self.timestamp) +
+        #                 str(self.data) +
+        #                 str(self.nonce ))
+        # self.hash = sha.hexdigest()
+        # return sha.hexdigest()
+        self.hash = k
+        return k
     @staticmethod
     def from_previous(block, data):
         return Block(block.index + 1, block.hash, datetime.now(), data, 0)
@@ -37,8 +48,22 @@ class Block(object):
 
 GENESIS = Block(
     0, '', 1522983367254, None, 0,
-    'e063dac549f070b523b0cb724efb1d4f81de67ea790f78419f9527aa3450f64c'
+    '8f6f732cd654d627d1d6bb532deb86a33653546a1741b2c179559466a6504f20'
 )
+
+
+# blockchain = [GENESIS]
+#
+# print ('block dau tien ',GENESIS.hash)
+# for i in range(0,4):
+#     previous_block = blockchain[-1]
+#     print ('hash block trk ', Block.calculate_hash(previous_block))
+#     block_to_add =Block.from_previous(previous_block, "data")
+#     block_to_add.hash=Block.calculate_hash(block_to_add) # tinh toan hash cua block hien tai
+#     blockchain.append(block_to_add)
+#     #previous_block = block_to_add
+#     print ('stt {}'.format(block_to_add.index))
+#     print ('HASH: {}'.format(block_to_add.hash))
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -69,13 +94,38 @@ class Server(object):
     def list_peers(self):
         return jsonify(self.peers)
 
+    def proof_of_work(self, block):
+        block.nonce = 0
+        block.hash = Block.calculate_hash(block)
+        while not block.hash.startswith('000'):
+            block.nonce +=1
+            block.hash = Block.calculate_hash(block)
+        return block.hash #return ve 1 hash hop le proof_of_work
     def add_blocks(self):
-        # TODO
-        pass
+
+        previous_block = blocks[-1]
+        current_block = Block.from_previous(previous_block, "ahihi") # tao ra 1 block moi
+
+        # start with '000' >> proof-of-work
+        current_block.hash = self.proof_of_work(current_block)
+        #if current_block.hash.startswith('000'): pass
+        #check : so sanh vs hash cua block trk
+        if previous_block.hash == current_block.previous_hash and current_block.index > previous_block.index:
+            blocks.append(current_block)
+
 
     def add_transactions(self):
         # TODO
         pass
+
+    def createAccount(self):
+        #generate key pair based on password
+        #WITH NO PASSWORD :'(
+        # a = Random.new().read
+        # print (a)
+        private_key = RSA.generate(1024, Random.new().read)
+        public_key = private_key.publickey()
+        return public_key.exportKey(),private_key.exportKey()
 
     def run(self, host='0.0.0.0'):
         logging.info('Starting...')
