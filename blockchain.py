@@ -8,7 +8,7 @@ import hashlib
 from flask import Flask, jsonify
 from Crypto.PublicKey import RSA
 from Crypto import Random
-
+# https://www.ibm.com/developerworks/cloud/library/cl-develop-blockchain-app-in-python/index.html
 class Block(object):
     def __init__(self, index, previous_hash, timestamp, data, nonce, hashvalue=''):
         self.index = index
@@ -34,7 +34,7 @@ class Block(object):
         return k
     @staticmethod
     def from_previous(block, data):
-        return Block(block.index + 1, block.hash, datetime.now(), data, 0)
+        return Block(block.index + 1, block.hash, datetime.now(), data,0)
 
     @staticmethod
     def from_json(block):
@@ -75,7 +75,9 @@ class Server(object):
     def __init__(self):
         self.blocks = [GENESIS]
         self.peers = {}
+        self.state = {}
 
+        self.unconfirmed_transactions = []
         self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.udp_logger = logging.getLogger('UDP')
@@ -94,7 +96,7 @@ class Server(object):
     def list_peers(self):
         return jsonify(self.peers)
 
-    def proof_of_work(self, block):
+    def proof_of_work(self, block): # day la cong viec cua add_block, K PHAI cua add_transactions
         block.nonce = 0
         block.hash = Block.calculate_hash(block)
         while not block.hash.startswith('000'):
@@ -103,29 +105,57 @@ class Server(object):
         return block.hash #return ve 1 hash hop le proof_of_work
     def add_blocks(self):
 
-        previous_block = blocks[-1]
-        current_block = Block.from_previous(previous_block, "ahihi") # tao ra 1 block moi
-
+        previous_block = self.blocks[-1]
+        current_block = Block.from_previous(previous_block, self.add_transactions()) # tao ra 1 block moi, voi data la ket qua cua add_transaction
+        # current_block.nonce = 0 ( hien tai thi nonce= 0, se thay doi trong proof_of_work)
         # start with '000' >> proof-of-work
         current_block.hash = self.proof_of_work(current_block)
-        #if current_block.hash.startswith('000'): pass
         #check : so sanh vs hash cua block trk
         if previous_block.hash == current_block.previous_hash and current_block.index > previous_block.index:
-            blocks.append(current_block)
+            self.blocks.append(current_block)
 
 
     def add_transactions(self):
-        # TODO
-        pass
+        publickey , privatekey = createAccount()
+        #sign signature
+        signature, hashmess = sign("ahihi",publickey)
+        #verify signature
+        if not verify(hashmess,signature,privatekey):
+            False
+        #verify a balance
+        if self.state[pub_key] <= 0:
+            return False
+        data = str(pub_key)+str(self.state[pub_key])
+        return data
+        # can return ra 1 hash cua transactions
+        #hash do co: key_pub(sender), key_pub(receiver), value
+
+    def sign(self, mess, publickey):
+        mess = mess.encode()
+        # cần hash "mess"
+        hashmess = hashlib.sha256(mess).hexdigest()
+        # tạo chữ kí
+        signature = publickey.encrypt(mess,1)
+        return signature, hashmess
+
+    def verify(self,hashmess ,signature, privatekey):
+        #publickey , privatekey = createAccount()
+        text = privatekey.decrypt(signature).decode()
+        hashtext = hashlib.sha256(text).hexdigest()
+        if hashtext==hashmess:
+            return True
+        return False
+        # nếu 2 hash không khác nhau >> nội dung mess k bị thay đổi
+        # đối với blockchain, đổi vị trí của publickey và privatekey, vì ai cũng có thể kiểm tra signature xem có chính chủ và k bị đổi k
 
     def createAccount(self):
         #generate key pair based on password
-        #WITH NO PASSWORD :'(
-        # a = Random.new().read
-        # print (a)
-        private_key = RSA.generate(1024, Random.new().read)
+        private_key = RSA.generate(1024)
         public_key = private_key.publickey()
-        return public_key.exportKey(),private_key.exportKey()
+
+        #self.state[public_key]=1000
+        # there is a way to save private_key in a file and give it for each node.
+        return public_key, private_key
 
     def run(self, host='0.0.0.0'):
         logging.info('Starting...')
